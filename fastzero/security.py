@@ -3,8 +3,7 @@ from http import HTTPStatus
 
 from fastapi import Depends, HTTPException
 from fastapi.security import OAuth2PasswordBearer
-from jwt import decode, encode
-from jwt.exceptions import PyJWTError
+from jwt import DecodeError, ExpiredSignatureError, decode, encode
 from pwdlib import PasswordHash
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -12,14 +11,14 @@ from zoneinfo import ZoneInfo
 
 from fastzero.database import get_session
 from fastzero.models import User
+from fastzero.schemas import TokenData
+from fastzero.settings import Settings
 
 pwd_context = PasswordHash.recommended()
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl='token')
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl='auth/token')
 
-SECRET_KEY = 'secret_key'
-ALGORITHM = 'HS256'
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
+settings = Settings()
 
 
 def get_password_hash(password: str):
@@ -35,17 +34,19 @@ def create_access_token(payload: dict):
 
     # Adiciona um tempo de 30 minutos para expiração
     expire = datetime.now(tz=ZoneInfo('UTC')) + timedelta(
-        minutes=ACCESS_TOKEN_EXPIRE_MINUTES
+        minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
     )
 
     to_encode.update({'exp': expire})
 
-    encoded_jwt = encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    encoded_jwt = encode(
+        to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM
+    )
 
     return encoded_jwt
 
 
-def get_current_user(
+async def get_current_user(
     session: Session = Depends(get_session),
     token: str = Depends(oauth2_scheme),
 ):
@@ -56,15 +57,23 @@ def get_current_user(
     )
 
     try:
-        payload = decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        username = payload.get('sub')
+        payload = decode(
+            token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
+        )
+        username: str = payload.get('sub')
 
         if not username:
             raise credentials_exception
-    except PyJWTError:
+
+        token_data = TokenData(username=username)
+    except ExpiredSignatureError:
+        raise credentials_exception
+    except DecodeError:
         raise credentials_exception
 
-    user = session.scalar(select(User).where(User.email == username))
+    user = session.scalar(
+        select(User).where(User.email == token_data.username)
+    )
 
     if not user:
         raise credentials_exception
