@@ -19,3 +19,6 @@ jobs:
 
       - name: Instalar dependências
         run: poetry install --no-dev
+
+      - name: Testar a cobertura de código
+        run: poetry run task test
