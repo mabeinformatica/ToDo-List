@@ -59,7 +59,9 @@ def list_todos(  # noqa: PLR0913, PLR0917
     if state:
         query = query.filter(Todo.state == state)
 
-    todos = session.scalars(query.offset(skip).limit(limit)).all()
+    todos = session.scalars(
+        query.offset(skip).limit(limit).order_by(Todo.id)
+    ).all()
 
     return {'todos': todos}
 

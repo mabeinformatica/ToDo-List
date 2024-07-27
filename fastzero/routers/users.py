@@ -100,5 +100,7 @@ def read_users(
     skip: int = 0,
     limit: int = 10,
 ):
-    users = session.scalars(select(User).offset(skip).limit(limit))
+    users = session.scalars(
+        select(User).order_by(User.id).offset(skip).limit(limit)
+    )
     return {'users': users}

@@ -21,9 +21,9 @@ class User:
     __tablename__ = 'users'
 
     id: Mapped[int] = mapped_column(init=False, primary_key=True)
-    username: Mapped[str] = mapped_column(unique=True)
-    email: Mapped[str] = mapped_column(unique=True)
-    password: Mapped[str]
+    username: Mapped[str] = mapped_column(String(length=100), unique=True)
+    email: Mapped[str] = mapped_column(String(length=250), unique=True)
+    password: Mapped[str] = mapped_column(String(length=250))
     created_at: Mapped[datetime] = mapped_column(
         init=False, server_default=func.now()
     )
@@ -35,8 +35,10 @@ class Todo:
 
     id: Mapped[int] = mapped_column(init=False, primary_key=True)
     title: Mapped[str] = mapped_column(String(length=50))
-    description: Mapped[str] = mapped_column()
-    state: Mapped[TodoState] = mapped_column(default=TodoState.draft)
+    description: Mapped[str] = mapped_column(String(length=250))
+    state: Mapped[TodoState] = mapped_column(
+        String(length=5), default=TodoState.draft
+    )
     created_at: Mapped[datetime] = mapped_column(
         init=False, server_default=func.now()
     )

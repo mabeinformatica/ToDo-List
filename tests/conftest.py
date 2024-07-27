@@ -1,15 +1,19 @@
 import factory
 import factory.fuzzy
 import pytest
+from faker import Faker
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
-from sqlalchemy.pool import StaticPool
+from testcontainers.postgres import PostgresContainer
 
+# from testcontainers.mssql import SqlServerContainer
 from fastzero.app import app
 from fastzero.database import get_session
 from fastzero.models import Todo, TodoState, User, table_registry
 from fastzero.security import get_password_hash
+
+faker = Faker()
 
 
 class UserFactory(factory.Factory):
@@ -25,8 +29,10 @@ class TodoFactory(factory.Factory):
     class Meta:
         model = Todo
 
-    title = factory.Faker('text')
-    description = factory.Faker('text')
+    title = factory.LazyAttribute(lambda x: faker.text(max_nb_chars=50))
+    description = factory.LazyAttribute(lambda x: faker.text(max_nb_chars=249))
+    # title = factory.Faker('text', locale='pt-BR')
+    # description = factory.Faker('text', locale='pt-BR')
     state = factory.fuzzy.FuzzyChoice(TodoState)
     userId = 1
 
@@ -44,14 +50,46 @@ def client(session):
     app.dependency_overrides.clear()
 
 
-@pytest.fixture()
+""" @pytest.fixture()
 def session():
     engine = create_engine(
-        'sqlite:///:memory:',
-        connect_args={'check_same_thread': False},
-        poolclass=StaticPool,
-    )
+            'sqlite:///:memory:',
+            connect_args={'check_same_thread': False},
+            poolclass=StaticPool,
+        )
+    engine = create_engine(Settings().DATABASE_URL)
 
+    table_registry.metadata.create_all(engine)
+
+    with Session(engine) as session:
+        yield session
+
+    table_registry.metadata.drop_all(engine)
+ """
+
+
+@pytest.fixture(scope='session')
+def engine():
+    with PostgresContainer('postgres:16', driver='psycopg') as postgres:
+        _engine = create_engine(postgres.get_connection_url())
+
+        with _engine.begin():
+            yield _engine
+
+
+""" @pytest.fixture(scope='session')
+def engine():
+    with SqlServerContainer('mcr.microsoft.com/mssql/server:latest') as mssql:
+        _engine = create_engine(mssql.get_connection_url())
+
+        with _engine.begin():
+            yield _engine
+
+ """
+
+
+@pytest.fixture()
+def session(engine):
     table_registry.metadata.create_all(engine)
 
     with Session(engine) as session:
